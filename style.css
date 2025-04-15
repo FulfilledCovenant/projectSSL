@@ -1,5 +1,35 @@
-body { font-family: sans-serif; }
-#item-list { display: flex; flex-direction: column; gap: 10px; }
-.item { border: 1px solid #ccc; padding: 10px; margin-bottom: 5px; }
-.item-name { font-weight: bold; }
-.item-value { color: blue; }
+body {
+    font-family: sans-serif;
+    padding: 20px;
+    background-color: #f4f4f4;
+}
+
+h1 {
+    color: #333;
+}
+
+#items-list {
+    margin-top: 20px;
+    padding: 15px;
+    background-color: #fff;
+    border-radius: 5px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.item {
+    padding: 10px 0;
+    border-bottom: 1px solid #eee;
+}
+
+.item:last-child {
+    border-bottom: none;
+}
+
+.item-name {
+    font-weight: bold;
+}
+
+.item-price {
+    margin-left: 10px;
+    color: green;
+}

@@ -1,15 +1,22 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <title>Item Value Tracker</title>
-  <link rel="stylesheet" href="style.css"> </head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Game Item Prices</title>
+    <link rel="stylesheet" href="style.css">
+</head>
 <body>
-  <h1>Item Values</h1>
-  <div id="item-list">
-  </div>
+    <h1>Game Item Prices</h1>
+    <div id="items-list">
+        Loading prices...
+    </div>
 
-  <script src="https://www.gstatic.com/firebasejs/9.x.x/firebase-app-compat.js"></script> <!-- Firebase Core Library -->
-  <script src="https://www.gstatic.com/firebasejs/9.x.x/firebase-database-compat.js"></script> <!-- Firebase Realtime Database Library -->
-  <script src="script.js"></script>
+    <!-- Firebase Libraries -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+
+    <!-- Your Script -->
+    <script src="script.js"></script>
 </body>
 </html>
