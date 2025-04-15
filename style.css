@@ -1,0 +1,5 @@
+body { font-family: sans-serif; }
+#item-list { display: flex; flex-direction: column; gap: 10px; }
+.item { border: 1px solid #ccc; padding: 10px; margin-bottom: 5px; }
+.item-name { font-weight: bold; }
+.item-value { color: blue; }
