@@ -33,7 +33,7 @@ function displayItems(items) {
     // Loop through each item and create HTML to display it
     Object.keys(items).forEach(itemName => {
         const item = items[itemName];
-        const price = item.price !== undefined ? item.price : 'N/A'; // Handle items without a price
+        const price = item !== null && item !== undefined ? item : 'N/A'; // Directly use the item's value as the price
 
         const itemElement = document.createElement('div');
         itemElement.classList.add('item'); // Add a CSS class for styling
