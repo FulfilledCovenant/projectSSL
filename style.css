@@ -90,25 +90,46 @@ h1 {
 #items-table th:nth-child(1), /* Item Name Header */
 #items-table td:nth-child(1) { /* Item Name Cell */
     text-align: left;
-    width: 40%; /* Give item name more space */
-    font-weight: 500; /* Slightly bolder item names */
+    width: 35%; /* Adjust width */
+    font-weight: 500;
     color: #f0f0f0;
 }
 
-#items-table th:nth-child(2), /* Price Header */
-#items-table td:nth-child(2) { /* Price Cell */
-    text-align: right;
+/* Sparkline column */
+#items-table th:nth-child(2),
+#items-table td:nth-child(2) {
+    text-align: center; /* Center align the graph */
+    width: 15%;        /* Allocate specific width */
+    padding-top: 10px;    /* Add some padding for canvas */
+    padding-bottom: 10px;
 }
 
-#items-table th:nth-child(3), /* Change Header */
-#items-table td:nth-child(3) { /* Change Cell */
+#items-table th:nth-child(3), /* Price Header (was 2nd) */
+#items-table td:nth-child(3) { /* Price Cell (was 2nd) */
     text-align: right;
+    width: 18%; /* Adjust width */
 }
 
-#items-table th:nth-child(4), /* Change % Header */
-#items-table td:nth-child(4) { /* Change % Cell */
+#items-table th:nth-child(4), /* Change Header (was 3rd) */
+#items-table td:nth-child(4) { /* Change Cell (was 3rd) */
     text-align: right;
+     width: 16%; /* Adjust width */
 }
+
+#items-table th:nth-child(5), /* Change % Header (was 4th) */
+#items-table td:nth-child(5) { /* Change % Cell (was 4th) */
+    text-align: right;
+     width: 16%; /* Adjust width */
+}
+
+/* Style for the sparkline canvas itself */
+.sparkline-canvas {
+    display: inline-block; /* Allows centering */
+    vertical-align: middle; /* Align with text if needed */
+    max-width: 100%; /* Ensure it doesn't overflow cell */
+    height: auto; /* Maintain aspect ratio if width changes */
+}
+
 
 /* --- Price Change Styling --- */
 .positive-change {
@@ -193,6 +214,9 @@ h1 {
 #chart-no-data {
     color: #a0a0a0;
     font-style: italic;
+    display: none; /* Hide by default */
+    text-align: center;
+    margin-top: 20px;
 }
 
 /* Optional: Improve scrollbar appearance in chart popup for webkit browsers */
