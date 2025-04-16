@@ -1,66 +1,67 @@
 /* --- Global Styles & Font --- */
 * {
-    box-sizing: border-box; /* Better layout control */
+    box-sizing: border-box;
     margin: 0;
     padding: 0;
 }
 
 body {
-    font-family: 'Roboto', sans-serif; /* Use Google Font */
-    background-color: #1a1a1d; /* Slightly different dark background */
-    color: #e0e0e0; /* Lighter grey text for better contrast */
+    font-family: 'Roboto', sans-serif;
+    background-color: #1a1a1d;
+    color: #e0e0e0;
     padding: 20px;
     line-height: 1.6;
 }
 
-.container { /* Optional: Add a container div in index.html around h1 and table if needed */
-    max-width: 900px; /* Limit content width */
-    margin: 20px auto; /* Center content */
+.container {
+    max-width: 900px;
+    margin: 20px auto;
     padding: 0 15px;
 }
 
 h1 {
-    color: #f5f5f5; /* Brighter white for title */
+    color: #f5f5f5;
     text-align: center;
-    margin-bottom: 40px; /* More space below title */
-    font-weight: 700; /* Bolder title */
-    font-size: 2.5em; /* Larger title */
+    margin-bottom: 40px;
+    font-weight: 700;
+    font-size: 2.5em;
 }
 
 /* --- Table Styling --- */
 #items-table {
     width: 100%;
     border-collapse: collapse;
-    background-color: #2c2c31; /* Darker table background */
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4); /* Enhanced shadow */
-    border-radius: 8px; /* Rounded corners for the table */
-    overflow: hidden; /* Ensures border-radius clips content */
-    margin: 0 auto; /* Center table if not using .container */
+    background-color: #2c2c31;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+    border-radius: 8px;
+    overflow: hidden;
+    margin: 0 auto;
 }
 
 /* Table Header */
 #items-table th {
-    background-color: #404045; /* Distinct header background */
+    background-color: #404045;
     color: #ffffff;
-    font-weight: 500; /* Medium weight for headers */
-    padding: 15px 20px; /* More padding */
-    text-align: left; /* Align headers left by default */
-    text-transform: uppercase; /* Uppercase headers */
-    font-size: 0.85em; /* Slightly smaller header text */
+    font-weight: 500;
+    padding: 15px 20px;
+    text-align: left;
+    text-transform: uppercase;
+    font-size: 0.85em;
     letter-spacing: 0.5px;
-    border-bottom: 2px solid #55555a; /* Stronger border below header */
+    border-bottom: 2px solid #55555a;
 }
 
 /* Table Body Cells */
 #items-table td {
-    padding: 12px 20px; /* Consistent padding */
-    border-bottom: 1px solid #3a3a40; /* Subtle border between rows */
-    vertical-align: middle; /* Align text vertically in cells */
+    padding: 12px 20px;
+    border-bottom: 1px solid #3a3a40;
+    vertical-align: middle;
+    transition: background-color 0.5s ease-out; /* Smooth background fade for highlight */
 }
 
 /* Zebra Striping for Rows */
 #items-table tbody tr:nth-child(even) {
-    background-color: #313136; /* Slightly lighter for even rows */
+    background-color: #313136;
 }
 
 /* Remove border from last row */
@@ -70,18 +71,18 @@ h1 {
 
 /* Hover Effect */
 #items-table tbody tr:hover {
-    background-color: #4a4a50; /* Highlight row on hover */
+    background-color: #4a4a50;
 }
 
 /* Clickable Rows Indication */
 #items-table tbody tr {
     cursor: pointer;
-    transition: background-color 0.2s ease-in-out; /* Smooth hover transition */
+    transition: background-color 0.2s ease-in-out; /* Smooth hover transition (distinct from highlight) */
 }
 
 /* Highlight selected row (when chart is open) */
 #items-table tbody tr.selected-row {
-    background-color: #5f5f66; /* Darker highlight for selection */
+    background-color: #5f5f66;
     font-weight: 500;
 }
 
@@ -90,7 +91,7 @@ h1 {
 #items-table th:nth-child(1), /* Item Name Header */
 #items-table td:nth-child(1) { /* Item Name Cell */
     text-align: left;
-    width: 35%; /* Adjust width */
+    width: 35%;
     font-weight: 500;
     color: #f0f0f0;
 }
@@ -98,47 +99,47 @@ h1 {
 /* Sparkline column */
 #items-table th:nth-child(2),
 #items-table td:nth-child(2) {
-    text-align: center; /* Center align the graph */
-    width: 15%;        /* Allocate specific width */
-    padding-top: 10px;    /* Add some padding for canvas */
+    text-align: center;
+    width: 15%;
+    padding-top: 10px;
     padding-bottom: 10px;
 }
 
-#items-table th:nth-child(3), /* Price Header (was 2nd) */
-#items-table td:nth-child(3) { /* Price Cell (was 2nd) */
+#items-table th:nth-child(3), /* Price Header */
+#items-table td:nth-child(3) { /* Price Cell */
     text-align: right;
-    width: 18%; /* Adjust width */
+    width: 18%;
 }
 
-#items-table th:nth-child(4), /* Change Header (was 3rd) */
-#items-table td:nth-child(4) { /* Change Cell (was 3rd) */
+#items-table th:nth-child(4), /* Change Header */
+#items-table td:nth-child(4) { /* Change Cell */
     text-align: right;
-     width: 16%; /* Adjust width */
+     width: 16%;
 }
 
-#items-table th:nth-child(5), /* Change % Header (was 4th) */
-#items-table td:nth-child(5) { /* Change % Cell (was 4th) */
+#items-table th:nth-child(5), /* Change % Header */
+#items-table td:nth-child(5) { /* Change % Cell */
     text-align: right;
-     width: 16%; /* Adjust width */
+     width: 16%;
 }
 
 /* Style for the sparkline canvas itself */
 .sparkline-canvas {
-    display: inline-block; /* Allows centering */
-    vertical-align: middle; /* Align with text if needed */
-    max-width: 100%; /* Ensure it doesn't overflow cell */
-    height: auto; /* Maintain aspect ratio if width changes */
+    display: inline-block;
+    vertical-align: middle;
+    max-width: 100%;
+    height: auto;
 }
 
 
 /* --- Price Change Styling --- */
 .positive-change {
-    color: #50c878; /* A slightly softer green */
+    color: #50c878;
     font-weight: 500;
 }
 
 .negative-change {
-    color: #f08080; /* A slightly softer red */
+    color: #f08080;
     font-weight: 500;
 }
 
@@ -146,35 +147,44 @@ h1 {
     color: #888888;
 }
 
+/* --- Highlight Animation Classes --- */
+.highlight-positive {
+    background-color: rgba(80, 200, 120, 0.3) !important; /* Semi-transparent green */
+}
 
-/* --- Chart Popup Styling (Review/Refine) --- */
+.highlight-negative {
+    background-color: rgba(240, 128, 128, 0.3) !important; /* Semi-transparent red */
+}
+
+
+/* --- Chart Popup Styling --- */
 .chart-popup {
     position: fixed;
     left: 0;
     top: 0;
     width: 100%;
     height: 100%;
-    background-color: rgba(10, 10, 10, 0.85); /* Darker, less transparent overlay */
+    background-color: rgba(10, 10, 10, 0.85);
     z-index: 1000;
     display: flex;
     justify-content: center;
     align-items: center;
     padding: 20px;
-    backdrop-filter: blur(3px); /* Optional: Blur background */
+    backdrop-filter: blur(3px);
     -webkit-backdrop-filter: blur(3px);
 }
 
 .chart-content {
-    background-color: #2c2c31; /* Match table background */
-    padding: 30px; /* More padding */
+    background-color: #2c2c31;
+    padding: 30px;
     border-radius: 10px;
     box-shadow: 0 8px 25px rgba(0, 0, 0, 0.6);
     position: relative;
-    width: 95%; /* Use more width */
-    max-width: 800px; /* Increase max width */
+    width: 95%;
+    max-width: 800px;
     max-height: 85vh;
     overflow-y: auto;
-    border: 1px solid #404045; /* Subtle border */
+    border: 1px solid #404045;
 }
 
 .close-chart-btn {
@@ -204,9 +214,9 @@ h1 {
 
 .chart-wrapper {
     position: relative;
-    height: 50vh; /* More height for chart */
+    height: 50vh;
     min-height: 300px;
-    background-color: rgba(0,0,0,0.1); /* Faint background inside wrapper */
+    background-color: rgba(0,0,0,0.1);
     border-radius: 4px;
     padding: 10px;
 }
@@ -214,21 +224,11 @@ h1 {
 #chart-no-data {
     color: #a0a0a0;
     font-style: italic;
-    display: none; /* Hide by default */
+    display: none;
     text-align: center;
     margin-top: 20px;
 }
 
-/* Optional: Improve scrollbar appearance in chart popup for webkit browsers */
-.chart-content::-webkit-scrollbar {
-    width: 8px;
-}
-.chart-content::-webkit-scrollbar-track {
-    background: #313136;
-    border-radius: 4px;
-}
-.chart-content::-webkit-scrollbar-thumb {
-    background-color: #55555a;
-    border-radius: 4px;
-    border: 2px solid #313136;
-}
+.chart-content::-webkit-scrollbar { width: 8px; }
+.chart-content::-webkit-scrollbar-track { background: #313136; border-radius: 4px; }
+.chart-content::-webkit-scrollbar-thumb { background-color: #55555a; border-radius: 4px; border: 2px solid #313136; }
