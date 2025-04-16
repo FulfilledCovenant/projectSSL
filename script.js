@@ -12,182 +12,187 @@ const firebaseConfig = {
 // Initialize Firebase
 firebase.initializeApp(firebaseConfig);
 const database = firebase.database();
-
-// Get a reference to the 'items' data in Firebase
 const itemsRef = database.ref('items');
-
-// Get a reference to the HTML table body element
 const tableBody = document.getElementById('items-table-body');
 
 // --- State Management with localStorage ---
-// Key for storing data in localStorage
-const storageKey = 'gameItemPreviousPrices';
+const storageKey = 'gameItemPriceStates'; // Changed key name
 
-// Initialize previousPrices: Try loading from localStorage first
-let previousPrices = {};
-const storedPricesString = localStorage.getItem(storageKey);
-if (storedPricesString) {
+// Structure stored per item: { price: number, change: number|'N/A', changePercent: number|'N/A', changeClass: string }
+let itemStates = {};
+const storedStatesString = localStorage.getItem(storageKey);
+if (storedStatesString) {
     try {
-        previousPrices = JSON.parse(storedPricesString);
-        console.log("Loaded initial previous prices from localStorage:", previousPrices);
+        itemStates = JSON.parse(storedStatesString);
+        console.log("Loaded initial item states from localStorage:", itemStates);
     } catch (e) {
-        console.error("Error parsing stored prices:", e);
-        // If parsing fails, clear the invalid data and start fresh
+        console.error("Error parsing stored states:", e);
         localStorage.removeItem(storageKey);
-        previousPrices = {};
+        itemStates = {};
     }
 }
 // --- End State Management ---
 
-
-// Function to format numbers (optional, but nice)
 function formatNumber(num) {
-    if (typeof num !== 'number') return num; // Return as is if not a number
-    return num.toLocaleString(); // Adds commas, e.g., 1000 -> 1,000
+    if (typeof num !== 'number') return num;
+    return num.toLocaleString();
 }
 
-// Function to display items in the table
-// NOW USES THE GLOBAL `previousPrices` for calculation
-function displayItems(currentData) {
+// Function to display items - uses and updates the global `itemStates`
+function displayItems(currentFirebaseData) {
     tableBody.innerHTML = ''; // Clear the current table body
+    currentFirebaseData = currentFirebaseData || {};
 
-    // Ensure currentData is an object, even if Firebase returns null
-    currentData = currentData || {};
+    let newItemStates = {}; // Build the next state to be saved
 
-    if (Object.keys(currentData).length === 0 && Object.keys(previousPrices).length === 0) {
-        tableBody.innerHTML = '<tr><td colspan="4">No items found.</td></tr>';
-        return {}; // Return empty object as there are no new prices to track
-    }
-
-    let nextPreviousPrices = {}; // Will hold the prices from *this* update
-
-    // Combine keys from both current and previous data to handle deleted items
-    const allItemKeys = new Set([...Object.keys(currentData), ...Object.keys(previousPrices)]);
-
-    // Sort keys alphabetically
+    const allItemKeys = new Set([...Object.keys(currentFirebaseData), ...Object.keys(itemStates)]);
     const sortedKeys = Array.from(allItemKeys).sort();
 
+     // Show loading only if there's absolutely nothing initially
+     if (sortedKeys.length === 0) {
+         tableBody.innerHTML = '<tr><td colspan="4">Loading or no items found...</td></tr>';
+         return {}; // No states to save yet
+     }
+
+
     sortedKeys.forEach(itemName => {
-        const currentPrice = currentData[itemName]; // Might be undefined if item deleted
-        const previousPrice = previousPrices[itemName]; // Might be undefined if item is new
+        const currentPrice = currentFirebaseData[itemName]; // Price from Firebase RIGHT NOW
+        const previousState = itemStates[itemName]; // State from LAST update (loaded or from previous run)
 
-        // Only proceed if the item existed before or exists now
-        if (currentPrice === undefined && previousPrice === undefined) {
-            return; // Skip if item doesn't exist in either dataset (shouldn't happen with Set logic)
-        }
+        // Default values for the new state of this item
+        let newState = {
+            price: 'N/A',
+            change: 'N/A',
+            changePercent: 'N/A',
+            changeClass: 'no-change',
+            changePrefix: '' // Store prefix for consistency
+        };
 
-        let change = 'N/A';
-        let changePercent = 'N/A';
-        let changeClass = 'no-change';
-        let displayChange = 'N/A';
-        let displayChangePercent = 'N/A';
-        let changePrefix = '';
+        if (currentPrice !== undefined) {
+            // Item exists in Firebase data
+            newState.price = currentPrice; // The definite current price
 
-        // Calculate change ONLY if both current and previous prices are valid numbers
-        if (typeof currentPrice === 'number' && typeof previousPrice === 'number') {
-            change = currentPrice - previousPrice;
-            if (previousPrice !== 0) {
-                changePercent = (change / previousPrice) * 100;
-            } else if (currentPrice > 0) {
-                 changePercent = Infinity; // Handle division by zero if price went from 0 to non-zero
-            } else {
-                 changePercent = 0; // Price stayed at 0
+            // Calculate change based on previous *price* if available
+            if (previousState && typeof previousState.price === 'number' && typeof currentPrice === 'number') {
+                const priceDiff = currentPrice - previousState.price;
+                newState.change = priceDiff; // Store the raw change number
+
+                if (previousState.price !== 0) {
+                    newState.changePercent = (priceDiff / previousState.price) * 100;
+                } else if (currentPrice > 0) {
+                     newState.changePercent = Infinity;
+                } else {
+                     newState.changePercent = 0; // 0 -> 0 change
+                }
+
+
+                // Determine class and prefix based on calculated change
+                if (priceDiff > 0) {
+                    newState.changeClass = 'positive-change';
+                    newState.changePrefix = '+';
+                } else if (priceDiff < 0) {
+                    newState.changeClass = 'negative-change';
+                     // negative sign is automatic for the number
+                } else {
+                    newState.changeClass = 'no-change';
+                    newState.changePercent = 0; // Ensure 0% if change is 0
+                    newState.change = 0; // Ensure 0 if change is 0
+                }
+
+            } else if (typeof currentPrice === 'number') {
+                 // It's a new item or previous price wasn't a number, no change calculable yet
+                 newState.change = 'N/A';
+                 newState.changePercent = 'N/A';
+                 newState.changeClass = 'no-change';
             }
 
+        } else if (previousState) {
+            // Item existed before but is NOT in current Firebase data (deleted)
+             console.log(`Item "${itemName}" appears deleted.`);
+            // Do not add to newItemStates, effectively removing it.
+             // Also do not add a row to the table.
+            return; // Skip to next item in forEach
 
-            // Determine color class based on change
-            if (change > 0) {
-                changeClass = 'positive-change';
-                changePrefix = '+';
-            } else if (change < 0) {
-                changeClass = 'negative-change';
-                // Negative sign is automatic
-            }
-
-             // Format for display
-             displayChange = formatNumber(change.toFixed(0));
-             if (changePercent === Infinity) {
-                displayChangePercent = "∞%"; // Or use a large number like ">999%"
-             } else {
-                displayChangePercent = `${changePercent.toFixed(2)}%`;
-             }
-
-
-        } else if (typeof currentPrice === 'number' && previousPrice === undefined) {
-            // Item is new, show price but N/A for change
-            displayChange = 'N/A';
-            displayChangePercent = 'N/A';
-        } else if (currentPrice === undefined && typeof previousPrice === 'number') {
-             // Item was deleted, display previous price? Or 'Deleted'? Let's indicate deletion.
-             // We'll actually skip adding the row later if currentPrice is undefined.
         } else {
-             // Handle cases where price becomes non-numeric or was non-numeric
-             displayChange = 'N/A';
-             displayChangePercent = 'N/A';
+            // Item doesn't exist now and didn't exist before (shouldn't happen with Set logic)
+            return; // Skip
+        }
+
+        // --- Prepare display values from the newState ---
+        const displayPrice = typeof newState.price === 'number' ? formatNumber(newState.price) : 'N/A';
+
+        let displayChange = 'N/A';
+        if (typeof newState.change === 'number') {
+            displayChange = formatNumber(newState.change.toFixed(0));
+        }
+
+        let displayChangePercent = 'N/A';
+        if (typeof newState.changePercent === 'number') {
+            if (newState.changePercent === Infinity) {
+                displayChangePercent = "∞%";
+            } else {
+                displayChangePercent = `${newState.changePercent.toFixed(2)}%`;
+            }
         }
 
 
-        // Format current price for display
-        const displayPrice = typeof currentPrice === 'number' ? formatNumber(currentPrice) : (currentPrice === undefined ? ' (Deleted)' : 'N/A');
+        // --- Create and append table row ---
+        const itemRow = document.createElement('tr');
+        itemRow.innerHTML = `
+            <td>${itemName}</td>
+            <td>${displayPrice}</td>
+            <td class="${newState.changeClass}">${newState.changePrefix}${displayChange}</td>
+            <td class="${newState.changeClass}">${newState.changePrefix}${displayChangePercent}</td>
+        `;
+        tableBody.appendChild(itemRow);
 
-        // Only add row if the item currently exists
-         if (currentPrice !== undefined) {
-            const itemRow = document.createElement('tr');
-            itemRow.innerHTML = `
-                <td>${itemName}</td>
-                <td>${displayPrice}</td>
-                <td class="${changeClass}">${changePrefix}${displayChange}</td>
-                <td class="${changeClass}">${changePrefix}${displayChangePercent}</td>
-            `;
-            tableBody.appendChild(itemRow);
-
-             // Store the current price for the next update cycle / localStorage save
-             nextPreviousPrices[itemName] = currentPrice;
-         } else {
-             // Item was deleted, implicitly remove it from 'nextPreviousPrices'
-             console.log(`Item "${itemName}" removed.`);
-         }
-
+        // Add this calculated state to our map of current states
+        newItemStates[itemName] = newState;
     });
 
-    // Return the prices from this update cycle
-    return nextPreviousPrices;
+    // Return the complete map of states from this update cycle
+    return newItemStates;
 }
 
-// Listen for changes in the 'items' data
+
+// --- Initial Display on Load ---
+// Display using initially loaded states before Firebase connects
+// This shows the *persisted* change values immediately
+console.log("Performing initial display from loaded/empty itemStates");
+const initiallyDisplayedStates = displayItems(null); // Pass null to signify no *new* Firebase data yet
+// Update itemStates immediately ONLY if it was empty initially, otherwise keep loaded state
+// This prevents overwriting loaded state with N/As if Firebase is slow
+if (Object.keys(itemStates).length === 0) {
+    itemStates = initiallyDisplayedStates;
+}
+// --- End Initial Display ---
+
+
+// Listen for Firebase changes
 itemsRef.on('value', (snapshot) => {
-    const currentData = snapshot.val(); // Get the fresh data from Firebase
-    console.log("Firebase data received:", currentData);
-    console.log("Calculating change against (in-memory/loaded):", previousPrices);
+    const currentFirebaseData = snapshot.val();
+    console.log("Firebase data received:", currentFirebaseData);
+    console.log("Calculating changes based on current itemStates:", itemStates);
 
-    // Display items and get the latest price map
-    const latestPrices = displayItems(currentData);
+    // Update display & calculate next states based on new Firebase data and previous states
+    const latestStates = displayItems(currentFirebaseData);
 
-    // Update the in-memory state for the *next* intra-session update
-    previousPrices = latestPrices;
-    console.log("In-memory previousPrices updated to:", previousPrices);
+    // Update the in-memory state for the next Firebase update *within this session*
+    itemStates = latestStates;
+    console.log("In-memory itemStates updated to:", itemStates);
 
-
-    // Save the LATEST state to localStorage for the next page load/refresh
+    // Save the LATEST complete states (including calculated changes) to localStorage
     try {
-        // Only save if latestPrices is not empty (avoid saving empty object if data fetch fails)
-        if (Object.keys(latestPrices).length > 0) {
-             localStorage.setItem(storageKey, JSON.stringify(latestPrices));
-             console.log("Saved latest prices to localStorage:", latestPrices);
+        if (Object.keys(latestStates).length > 0) {
+            localStorage.setItem(storageKey, JSON.stringify(latestStates));
+            console.log("Saved latest item states to localStorage:", latestStates);
         } else {
-             // If the latest data is empty, remove the item from storage
-             localStorage.removeItem(storageKey);
-             console.log("Latest data empty, removed item from localStorage.");
+            localStorage.removeItem(storageKey);
+            console.log("Latest data resulted in empty states, cleared localStorage.");
         }
-
     } catch (e) {
-        console.error("Error saving prices to localStorage:", e);
+        console.error("Error saving states to localStorage:", e);
     }
 });
 
-console.log("Script loaded. Initial previousPrices state:", previousPrices);
-
-// Initial display call in case the 'on value' doesn't fire immediately (less common now)
-// Optional: Consider if you need a loading state until first data arrives
-// displayItems(null); // Or pass initial empty data? Might flash N/A briefly.
-// The 'on value' usually fires quickly enough on initial load.
+console.log("Script loaded. Initial itemStates:", itemStates);
