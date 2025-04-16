@@ -8,13 +8,29 @@
 </head>
 <body>
     <h1>Game Item Prices</h1>
-    <div id="items-list">
-        Loading prices...
-    </div>
 
+    <table id="items-table">
+        <thead>
+            <tr>
+                <th>Item Name</th>
+                <th>Price</th>
+                <th>Change</th>
+                <th>Change %</th>
+            </tr>
+        </thead>
+        <tbody id="items-table-body">
+            <!-- Item rows will be inserted here by JavaScript -->
+            <tr>
+                <td colspan="4">Loading prices...</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <!-- Firebase Libraries -->
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
 
+    <!-- Your Script -->
     <script src="script.js"></script>
 </body>
 </html>
