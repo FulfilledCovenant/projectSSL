@@ -1,35 +1,66 @@
 body {
     font-family: sans-serif;
+    background-color: #1e1e1e; /* Dark background */
+    color: #d4d4d4; /* Light text */
     padding: 20px;
-    background-color: #f4f4f4;
+    margin: 0;
 }
 
 h1 {
-    color: #333;
+    color: #cccccc;
+    text-align: center;
+    margin-bottom: 30px;
 }
 
-#items-list {
-    margin-top: 20px;
-    padding: 15px;
-    background-color: #fff;
-    border-radius: 5px;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+#items-table {
+    width: 100%;
+    max-width: 800px; /* Optional: Limit table width */
+    margin: 0 auto; /* Center the table */
+    border-collapse: collapse; /* Remove gaps between cells */
+    background-color: #252526; /* Slightly lighter dark for table */
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
 }
 
-.item {
-    padding: 10px 0;
-    border-bottom: 1px solid #eee;
+#items-table th,
+#items-table td {
+    padding: 12px 15px;
+    text-align: left;
+    border-bottom: 1px solid #333333; /* Darker border */
 }
 
-.item:last-child {
-    border-bottom: none;
-}
-
-.item-name {
+#items-table th {
+    background-color: #333333; /* Header background */
+    color: #e0e0e0;
     font-weight: bold;
 }
 
-.item-price {
-    margin-left: 10px;
-    color: green;
+#items-table tbody tr:last-child td {
+    border-bottom: none; /* Remove border from last row */
+}
+
+#items-table tbody tr:hover {
+    background-color: #3a3a3a; /* Highlight row on hover */
+}
+
+/* Styling for price changes */
+.positive-change {
+    color: #4CAF50; /* Green */
+    font-weight: bold;
+}
+
+.negative-change {
+    color: #F44336; /* Red */
+    font-weight: bold;
+}
+
+.no-change {
+    color: #888888; /* Grey for no change or N/A */
+}
+
+/* Right-align numerical columns */
+#items-table td:nth-child(2), /* Price */
+#items-table td:nth-child(3), /* Change */
+#items-table td:nth-child(4) { /* Change % */
+    text-align: right;
+    font-family: monospace; /* Optional: Use monospace for numbers */
 }
