@@ -26,9 +26,28 @@
         </tbody>
     </table>
 
+    <!-- Container for the chart -->
+    <div id="chart-popup" class="chart-popup" style="display: none;">
+         <div class="chart-content">
+             <button id="close-chart-btn" class="close-chart-btn">×</button>
+             <h2 id="chart-title">Item Price History (Last 24h)</h2>
+             <div class="chart-wrapper">
+                <canvas id="item-price-chart"></canvas>
+             </div>
+             <p id="chart-no-data" style="display: none; text-align: center; margin-top: 20px;">No history available for the last 24 hours for this item.</p>
+         </div>
+    </div>
+
+
     <!-- Firebase Libraries -->
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+
+    <!-- Chart.js Library -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@3.7.0/dist/chart.min.js"></script>
+    <!-- Optional: Add adapter for better time axis display -->
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@2.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+
 
     <!-- Your Script -->
     <script src="script.js"></script>
