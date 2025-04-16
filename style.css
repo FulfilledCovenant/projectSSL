@@ -1,66 +1,68 @@
-body {
-    font-family: sans-serif;
-    background-color: #1e1e1e; /* Dark background */
-    color: #d4d4d4; /* Light text */
+/* Chart Popup Styles */
+.chart-popup {
+    position: fixed; /* Stay in place */
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.7); /* Semi-transparent background */
+    z-index: 1000; /* Appear on top */
+    display: flex; /* Use flexbox for centering */
+    justify-content: center;
+    align-items: center;
     padding: 20px;
-    margin: 0;
+    box-sizing: border-box;
 }
 
-h1 {
+.chart-content {
+    background-color: #252526; /* Match table background */
+    padding: 25px;
+    border-radius: 8px;
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.5);
+    position: relative;
+    width: 90%;
+    max-width: 700px; /* Limit max width */
+    max-height: 80vh; /* Limit max height */
+    overflow-y: auto; /* Add scroll if content overflows */
+}
+
+.close-chart-btn {
+    position: absolute;
+    top: 10px;
+    right: 15px;
+    background: none;
+    border: none;
+    font-size: 2rem;
+    color: #aaaaaa;
+    cursor: pointer;
+    line-height: 1;
+}
+.close-chart-btn:hover {
+    color: #ffffff;
+}
+
+#chart-title {
+    margin-top: 0;
+    margin-bottom: 20px;
     color: #cccccc;
     text-align: center;
-    margin-bottom: 30px;
+    font-size: 1.4em;
 }
 
-#items-table {
-    width: 100%;
-    max-width: 800px; /* Optional: Limit table width */
-    margin: 0 auto; /* Center the table */
-    border-collapse: collapse; /* Remove gaps between cells */
-    background-color: #252526; /* Slightly lighter dark for table */
-    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
+.chart-wrapper {
+    position: relative;
+     /* Adjust height as needed, make sure it's responsive */
+     height: 40vh;
+     min-height: 250px;
 }
 
-#items-table th,
-#items-table td {
-    padding: 12px 15px;
-    text-align: left;
-    border-bottom: 1px solid #333333; /* Darker border */
+
+/* Style table rows to indicate they are clickable */
+#items-table tbody tr {
+    cursor: pointer;
 }
 
-#items-table th {
-    background-color: #333333; /* Header background */
-    color: #e0e0e0;
-    font-weight: bold;
-}
-
-#items-table tbody tr:last-child td {
-    border-bottom: none; /* Remove border from last row */
-}
-
-#items-table tbody tr:hover {
-    background-color: #3a3a3a; /* Highlight row on hover */
-}
-
-/* Styling for price changes */
-.positive-change {
-    color: #4CAF50; /* Green */
-    font-weight: bold;
-}
-
-.negative-change {
-    color: #F44336; /* Red */
-    font-weight: bold;
-}
-
-.no-change {
-    color: #888888; /* Grey for no change or N/A */
-}
-
-/* Right-align numerical columns */
-#items-table td:nth-child(2), /* Price */
-#items-table td:nth-child(3), /* Change */
-#items-table td:nth-child(4) { /* Change % */
-    text-align: right;
-    font-family: monospace; /* Optional: Use monospace for numbers */
+/* Optional: Highlight row being viewed */
+#items-table tbody tr.selected-row {
+    background-color: #4a4a4a; /* Darker highlight */
 }
