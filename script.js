@@ -10,6 +10,7 @@ const firebaseConfig = {
   measurementId: "G-ZQ5L4FC80P"
 };
 
+
 // --- Initialize Firebase ---
 if (firebaseConfig.apiKey.startsWith("AIza") && firebaseConfig.apiKey.includes("replace")) {
     alert("Please replace the placeholder Firebase configuration in script.js with your actual project config!");
@@ -27,59 +28,44 @@ const chartTitle = document.getElementById('chart-title');
 const closeChartBtn = document.getElementById('close-chart-btn');
 const chartCanvasElement = document.getElementById('item-price-chart');
 const chartNoDataMsg = document.getElementById('chart-no-data');
-let chartCtx = null; // Initialize context later
+let chartCtx = null;
 if (chartCanvasElement) {
     chartCtx = chartCanvasElement.getContext('2d');
 } else {
     console.error("Chart canvas element not found!");
 }
 
-
 // --- State Management ---
-const stateStorageKey = 'gameItemPriceStates_v1'; // Renamed to avoid conflicts if structure changed
-const historyStorageKey = 'gameItemPriceHistory_v3'; // Renamed for potential structure changes
-let itemStates = {}; // Holds { price, change, changePercent, changeClass, changePrefix }
-let itemHistory = {}; // Holds { itemName: [{ts: timestamp, price: number}] }
-let itemChartInstance = null; // Holds the Chart.js instance
+const stateStorageKey = 'gameItemPriceStates_v1';
+const historyStorageKey = 'gameItemPriceHistory_v3';
+let itemStates = {};
+let itemHistory = {};
+let itemChartInstance = null;
 
 // --- Load Initial State & History ---
 function loadInitialData() {
     const storedStatesString = localStorage.getItem(stateStorageKey);
     if (storedStatesString) {
-        try {
-            itemStates = JSON.parse(storedStatesString);
-            console.log("Loaded states:", Object.keys(itemStates).length, "items");
-        } catch (e) { console.error("Error parsing stored states:", e); localStorage.removeItem(stateStorageKey); itemStates = {}; }
+        try { itemStates = JSON.parse(storedStatesString); console.log("Loaded states:", Object.keys(itemStates).length, "items"); }
+        catch (e) { console.error("Error parsing stored states:", e); localStorage.removeItem(stateStorageKey); itemStates = {}; }
     }
-
     const storedHistoryString = localStorage.getItem(historyStorageKey);
     if (storedHistoryString) {
-        try {
-            itemHistory = JSON.parse(storedHistoryString);
-            console.log("Loaded history for", Object.keys(itemHistory).length, "items");
-            // Optional: Prune history on load to clean up very old data
-            pruneAllHistory();
-        } catch (e) { console.error("Error parsing stored history:", e); localStorage.removeItem(historyStorageKey); itemHistory = {};}
+        try { itemHistory = JSON.parse(storedHistoryString); console.log("Loaded history for", Object.keys(itemHistory).length, "items"); pruneAllHistory(); }
+        catch (e) { console.error("Error parsing stored history:", e); localStorage.removeItem(historyStorageKey); itemHistory = {}; }
     }
 }
 
 // --- History Management ---
-const HISTORY_DURATION_MS = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
+const HISTORY_DURATION_MS = 24 * 60 * 60 * 1000;
 
 function addHistoryPoint(itemName, price) {
     if (typeof price !== 'number') return;
     const now = Date.now();
-    if (!itemHistory[itemName]) {
-        itemHistory[itemName] = [];
-    }
-    // Avoid adding duplicate points with the exact same timestamp (can happen with rapid updates)
+    if (!itemHistory[itemName]) itemHistory[itemName] = [];
     const lastPoint = itemHistory[itemName][itemHistory[itemName].length - 1];
-    if (lastPoint && lastPoint.ts === now && lastPoint.price === price) {
-        return; // Skip duplicate
-    }
-
+    if (lastPoint && lastPoint.ts === now && lastPoint.price === price) return; // Skip exact duplicate
     itemHistory[itemName].push({ ts: now, price: price });
-    // Pruning happens here too
     const cutoffTime = now - HISTORY_DURATION_MS;
     itemHistory[itemName] = itemHistory[itemName].filter(point => point.ts >= cutoffTime);
 }
@@ -91,40 +77,23 @@ function pruneAllHistory() {
     for (const itemName in itemHistory) {
         const originalLength = itemHistory[itemName].length;
         itemHistory[itemName] = itemHistory[itemName].filter(point => point.ts >= cutoffTime);
-        if (itemHistory[itemName].length !== originalLength) {
-            changed = true;
-        }
-        // Remove item from history if it has no points left
-        if (itemHistory[itemName].length === 0) {
-            delete itemHistory[itemName];
-            changed = true;
-        }
+        if (itemHistory[itemName].length !== originalLength) changed = true;
+        if (itemHistory[itemName].length === 0) { delete itemHistory[itemName]; changed = true; }
     }
-    if (changed) {
-        console.log("Pruned old history entries.");
-        saveHistory(); // Save if pruning occurred
-    }
+    if (changed) { console.log("Pruned old history entries."); saveHistory(); }
 }
 
 function saveHistory() {
     try {
-        if (Object.keys(itemHistory).length > 0) {
-            localStorage.setItem(historyStorageKey, JSON.stringify(itemHistory));
-        } else {
-            localStorage.removeItem(historyStorageKey); // Clean up if empty
-        }
+        if (Object.keys(itemHistory).length > 0) localStorage.setItem(historyStorageKey, JSON.stringify(itemHistory));
+        else localStorage.removeItem(historyStorageKey);
     } catch (e) { console.error("Error saving history:", e); }
 }
 
 function saveStates() {
      try {
-        if (Object.keys(itemStates).length > 0) {
-             localStorage.setItem(stateStorageKey, JSON.stringify(itemStates));
-             // console.log("Saved latest item states"); // Reduce console noise
-        } else {
-             localStorage.removeItem(stateStorageKey);
-             console.log("Item states empty, removed from localStorage.");
-        }
+        if (Object.keys(itemStates).length > 0) localStorage.setItem(stateStorageKey, JSON.stringify(itemStates));
+        else { localStorage.removeItem(stateStorageKey); console.log("Item states empty, removed from localStorage."); }
      } catch (e) { console.error("Error saving states:", e); }
 }
 
@@ -137,143 +106,59 @@ function formatNumber(num) {
 // --- Sparkline Drawing Function ---
 function drawSparkline(canvas, historyData) {
     if (!canvas || !historyData || historyData.length < 2) {
-        if(canvas) {
-            const ctx = canvas.getContext('2d');
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-        }
-        return;
+        if(canvas) { canvas.getContext('2d').clearRect(0, 0, canvas.width, canvas.height); } return;
     }
-
-    const ctx = canvas.getContext('2d');
-    const width = canvas.width;
-    const height = canvas.height;
+    const ctx = canvas.getContext('2d'), width = canvas.width, height = canvas.height;
     ctx.clearRect(0, 0, width, height);
-
-    let minPrice = historyData[0].price, maxPrice = historyData[0].price;
-    let minTs = historyData[0].ts, maxTs = historyData[0].ts;
-
+    let minPrice = historyData[0].price, maxPrice = historyData[0].price, minTs = historyData[0].ts, maxTs = historyData[0].ts;
     for (let i = 1; i < historyData.length; i++) {
-        const point = historyData[i];
-        if (point.price < minPrice) minPrice = point.price;
-        if (point.price > maxPrice) maxPrice = point.price;
-        if (point.ts < minTs) minTs = point.ts; // Should be sorted but check
-        if (point.ts > maxTs) maxTs = point.ts;
+        const p = historyData[i];
+        if (p.price < minPrice) minPrice = p.price; if (p.price > maxPrice) maxPrice = p.price;
+        if (p.ts < minTs) minTs = p.ts; if (p.ts > maxTs) maxTs = p.ts;
     }
-
-    const priceRange = maxPrice - minPrice;
-    const timeRange = maxTs - minTs;
-
-    const startPrice = historyData[0].price;
-    const endPrice = historyData[historyData.length - 1].price;
-    ctx.strokeStyle = (endPrice > startPrice) ? '#50c878' : '#f08080';
-    ctx.lineWidth = 1.5;
-
-    ctx.beginPath();
-    const paddingX = 1, paddingY = 1;
-
+    const priceRange = maxPrice - minPrice, timeRange = maxTs - minTs;
+    const startPrice = historyData[0].price, endPrice = historyData[historyData.length - 1].price;
+    ctx.strokeStyle = (endPrice > startPrice) ? '#50c878' : '#f08080'; ctx.lineWidth = 1.5;
+    ctx.beginPath(); const padX = 1, padY = 1;
     for (let i = 0; i < historyData.length; i++) {
-        const point = historyData[i];
-        let x = paddingX;
-        if (timeRange > 0) x = paddingX + ((point.ts - minTs) / timeRange) * (width - 2 * paddingX);
-        else x = width / 2;
-
-        let y = height / 2;
-        if (priceRange > 0) y = (height - paddingY) - ((point.price - minPrice) / priceRange) * (height - 2 * paddingY);
-
-        if (i === 0) ctx.moveTo(x, y);
-        else ctx.lineTo(x, y);
+        const p = historyData[i]; let x = padX;
+        if (timeRange > 0) x = padX + ((p.ts - minTs) / timeRange) * (width - 2 * padX); else x = width / 2;
+        let y = height / 2; if (priceRange > 0) y = (height - padY) - ((p.price - minPrice) / priceRange) * (height - 2 * padY);
+        if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
     }
     ctx.stroke();
 }
 
-
 // --- Charting ---
 function showChart(itemName) {
     console.log(`Showing chart for: ${itemName}`);
-    const history = itemHistory[itemName] || [];
-    const now = Date.now();
-    const cutoffTime = now - HISTORY_DURATION_MS;
+    const history = itemHistory[itemName] || [], now = Date.now(), cutoffTime = now - HISTORY_DURATION_MS;
     const chartData = history.filter(point => point.ts >= cutoffTime);
-
-    if (itemChartInstance) itemChartInstance.destroy(); // Destroy previous chart
-    chartNoDataMsg.style.display = 'none'; // Hide message by default
-
-    // Prepare chart data points
+    if (itemChartInstance) itemChartInstance.destroy();
+    chartNoDataMsg.style.display = 'none';
     let chartPoints = [];
-    if (chartData.length === 0) {
-        console.log("No history points found for the last 24h.");
-        chartNoDataMsg.style.display = 'block'; // Show message
-    } else if (chartData.length === 1) {
-        // Duplicate point slightly earlier for Chart.js to draw *something*
-        chartPoints = [
-            { x: chartData[0].ts - 1000, y: chartData[0].price },
-            { x: chartData[0].ts, y: chartData[0].price }
-        ];
-    } else {
-        chartPoints = chartData.map(point => ({ x: point.ts, y: point.price }));
-    }
-
+    if (chartData.length === 0) { console.log("No history points."); chartNoDataMsg.style.display = 'block'; }
+    else if (chartData.length === 1) { chartPoints = [{ x: chartData[0].ts - 1000, y: chartData[0].price }, { x: chartData[0].ts, y: chartData[0].price }]; }
+    else { chartPoints = chartData.map(p => ({ x: p.ts, y: p.price })); }
     chartTitle.textContent = `${itemName} History (Last 24h)`;
-
-    if (chartPoints.length > 0 && chartCtx) { // Only create chart if there's data AND context exists
+    if (chartPoints.length > 0 && chartCtx) {
         itemChartInstance = new Chart(chartCtx, {
-            type: 'line',
-            data: {
-                datasets: [{
-                    label: 'Price',
-                    data: chartPoints,
-                    borderColor: 'rgb(75, 192, 192)', tension: 0.1,
-                    pointBackgroundColor: 'rgb(75, 192, 192)', pointRadius: 3,
-                    pointHoverRadius: 5 // Make points bigger on hover
-                }]
-            },
-            options: {
-                responsive: true, maintainAspectRatio: false,
-                scales: {
-                    x: {
-                        type: 'time', time: { unit: 'hour', tooltipFormat: 'PPpp', displayFormats: { hour: 'HH:mm' } },
-                        title: { display: true, text: 'Time', color: '#ccc' }, grid: { color: 'rgba(255, 255, 255, 0.1)' },
-                        ticks: { color: '#ccc'} // X-axis labels color
-                    },
-                    y: {
-                        beginAtZero: false, title: { display: true, text: 'Price', color: '#ccc'},
-                        ticks: { callback: (v) => formatNumber(v), color: '#ccc' }, // Y-axis labels color
-                        grid: { color: 'rgba(255, 255, 255, 0.1)' }
-                    }
-                },
-                plugins: {
-                    legend: { labels: { color: '#ccc' } }, // Legend text color
-                    tooltip: {
-                        callbacks: { label: (c) => `${c.dataset.label || ''}: ${formatNumber(c.parsed.y)}` },
-                         bodyFont: { size: 14 }, // Tooltip font size
-                         titleFont: { size: 16 }
-                    }
-                },
-                 interaction: { // Improve hover interaction
-                    mode: 'index',
-                    intersect: false,
-                 },
-            }
+            type: 'line', data: { datasets: [{ label: 'Price', data: chartPoints, borderColor: 'rgb(75, 192, 192)', tension: 0.1, pointBackgroundColor: 'rgb(75, 192, 192)', pointRadius: 3, pointHoverRadius: 5 }] },
+            options: { responsive: true, maintainAspectRatio: false, scales: { x: { type: 'time', time: { unit: 'hour', tooltipFormat: 'PPpp', displayFormats: { hour: 'HH:mm' } }, title: { display: true, text: 'Time', color: '#ccc' }, grid: { color: 'rgba(255, 255, 255, 0.1)' }, ticks: { color: '#ccc'} }, y: { beginAtZero: false, title: { display: true, text: 'Price', color: '#ccc'}, ticks: { callback: (v) => formatNumber(v), color: '#ccc' }, grid: { color: 'rgba(255, 255, 255, 0.1)' } } }, plugins: { legend: { labels: { color: '#ccc' } }, tooltip: { callbacks: { label: (c) => `${c.dataset.label || ''}: ${formatNumber(c.parsed.y)}` }, bodyFont: { size: 14 }, titleFont: { size: 16 } } }, interaction: { mode: 'index', intersect: false, }, }
         });
-    } else if (chartCtx) {
-         // Clear canvas if no data but context exists
-         chartCtx.clearRect(0, 0, chartCtx.canvas.width, chartCtx.canvas.height);
-    }
-
-    chartPopup.style.display = 'flex'; // Show the popup
+    } else if (chartCtx) { chartCtx.clearRect(0, 0, chartCtx.canvas.width, chartCtx.canvas.height); }
+    chartPopup.style.display = 'flex';
 }
-
 function hideChart() {
     if (itemChartInstance) { itemChartInstance.destroy(); itemChartInstance = null; }
     chartPopup.style.display = 'none';
     document.querySelectorAll('#items-table tbody tr.selected-row').forEach(r => r.classList.remove('selected-row'));
 }
 
-
-// --- Display Logic ---
+// --- Display Logic --- // MODIFIED FOR HIGHLIGHT //
 function displayItems(currentFirebaseData) {
     const isInitialLoad = currentFirebaseData === null;
-    tableBody.innerHTML = '';
+    tableBody.innerHTML = ''; // Clear previous rows
     const dataToShow = isInitialLoad ? {} : (currentFirebaseData || {});
 
     let newItemStates = {};
@@ -284,7 +169,7 @@ function displayItems(currentFirebaseData) {
 
     if (sortedKeys.length === 0) {
         tableBody.innerHTML = '<tr><td colspan="5">Loading or no items found...</td></tr>';
-        return {}; // Return empty state
+        return {};
     }
 
     let historyNeedsUpdate = false;
@@ -294,42 +179,44 @@ function displayItems(currentFirebaseData) {
         const previousState = itemStates[itemName];
         let stateToRender = {};
         let priceChanged = false;
+        let priceIncreased = false; // Track direction specifically for highlighting
 
         if (isInitialLoad) {
-            // Use stored state for initial display
             stateToRender = previousState || { price: 'N/A', change: 'N/A', changePercent: 'N/A', changeClass: 'no-change', changePrefix: '' };
         } else {
-            // Calculate new state based on Firebase update
             let calculatedState = { price: 'N/A', change: 'N/A', changePercent: 'N/A', changeClass: 'no-change', changePrefix: '' };
-
             if (currentPrice !== undefined) {
                 calculatedState.price = currentPrice;
                 if (previousState && typeof previousState.price === 'number' && typeof currentPrice === 'number') {
-                     if (previousState.price !== currentPrice) priceChanged = true; // Price definitely changed
-                     const priceDiff = currentPrice - previousState.price;
-                     calculatedState.change = priceDiff;
-                     if (previousState.price !== 0) calculatedState.changePercent = (priceDiff / previousState.price) * 100;
-                     else if (currentPrice > 0) calculatedState.changePercent = Infinity;
-                     else calculatedState.changePercent = 0;
+                    if (previousState.price !== currentPrice) {
+                        priceChanged = true;
+                        priceIncreased = currentPrice > previousState.price; // Check direction
+                    }
+                    const priceDiff = currentPrice - previousState.price;
+                    calculatedState.change = priceDiff;
+                    if (previousState.price !== 0) calculatedState.changePercent = (priceDiff / previousState.price) * 100;
+                    else if (currentPrice > 0) calculatedState.changePercent = Infinity;
+                    else calculatedState.changePercent = 0;
 
-                     if (priceDiff > 0) { calculatedState.changeClass = 'positive-change'; calculatedState.changePrefix = '+'; }
-                     else if (priceDiff < 0) { calculatedState.changeClass = 'negative-change'; }
-                     else { calculatedState.change = 0; calculatedState.changePercent = 0; } // Explicitly zero
+                    if (priceDiff > 0) { calculatedState.changeClass = 'positive-change'; calculatedState.changePrefix = '+'; }
+                    else if (priceDiff < 0) { calculatedState.changeClass = 'negative-change'; }
+                    else { calculatedState.change = 0; calculatedState.changePercent = 0; } // Explicitly zero
                 } else if (typeof currentPrice === 'number') {
-                     priceChanged = true; // New item added counts as change for history
-                     calculatedState.change = 'N/A'; calculatedState.changePercent = 'N/A';
+                    // New item added - treat as changed for history, but don't highlight price change
+                    priceChanged = true; // Add to history
+                    // No priceIncreased flag set here for highlight
+                    calculatedState.change = 'N/A'; calculatedState.changePercent = 'N/A';
                 }
 
-                if (priceChanged) {
+                if (priceChanged) { // Only add to history if *something* changed (price or existence)
                     addHistoryPoint(itemName, currentPrice);
                     historyNeedsUpdate = true;
                 }
                 stateToRender = calculatedState;
             } else if (previousState) {
-                // Item was deleted
-                return; // Don't render row, exclude from newItemStates
+                return; // Item deleted
             } else {
-                return; // Skip if doesn't exist now or before
+                return; // Skip ghost item
             }
         }
 
@@ -338,41 +225,75 @@ function displayItems(currentFirebaseData) {
         let displayChange = 'N/A', displayChangePercent = 'N/A';
         const displayChangeClass = stateToRender.changeClass || 'no-change';
         const displayChangePrefix = stateToRender.changePrefix || '';
-
         if (typeof stateToRender.change === 'number') displayChange = formatNumber(stateToRender.change.toFixed(0));
         if (typeof stateToRender.changePercent === 'number') {
             displayChangePercent = (stateToRender.changePercent === Infinity) ? "∞%" : `${stateToRender.changePercent.toFixed(2)}%`;
         }
 
-        // --- Create Row & Sparkline ---
+        // --- Create Row and Cells (Modified for individual cell access) ---
         if (stateToRender.price !== undefined) {
             const itemRow = document.createElement('tr');
             itemRow.setAttribute('data-item-name', itemName);
-            const sparklineCanvasId = `spark-${itemName.replace(/[^a-zA-Z0-9_\-]/g, '')}`; // Even safer ID
 
-            itemRow.innerHTML = `
-                <td>${itemName}</td>
-                <td><canvas id="${sparklineCanvasId}" class="sparkline-canvas" width="100" height="30"></canvas></td>
-                <td>${displayPrice}</td>
-                <td class="${displayChangeClass}">${displayChangePrefix}${displayChange}</td>
-                <td class="${displayChangeClass}">${displayChangePrefix}${displayChangePercent}</td>
-            `;
+            // Create Cells individually
+            const tdName = document.createElement('td');
+            tdName.textContent = itemName;
+            itemRow.appendChild(tdName);
+
+            const tdSpark = document.createElement('td');
+            const sparklineCanvasId = `spark-${itemName.replace(/[^a-zA-Z0-9_\-]/g, '')}`;
+            tdSpark.innerHTML = `<canvas id="${sparklineCanvasId}" class="sparkline-canvas" width="100" height="30"></canvas>`;
+            itemRow.appendChild(tdSpark);
+
+            const tdPrice = document.createElement('td');
+            tdPrice.textContent = displayPrice;
+            itemRow.appendChild(tdPrice);
+
+            const tdChange = document.createElement('td');
+            tdChange.className = displayChangeClass; // Apply positive/negative text color class
+            tdChange.textContent = `${displayChangePrefix}${displayChange}`;
+            itemRow.appendChild(tdChange);
+
+            const tdChangePercent = document.createElement('td');
+            tdChangePercent.className = displayChangeClass; // Apply positive/negative text color class
+            tdChangePercent.textContent = `${displayChangePrefix}${displayChangePercent}`;
+            itemRow.appendChild(tdChangePercent);
+
+
+            // Add click listener for chart
             itemRow.addEventListener('click', (e) => {
-                 document.querySelectorAll('#items-table tbody tr.selected-row').forEach(r => r.classList.remove('selected-row'));
-                 e.currentTarget.classList.add('selected-row');
-                 showChart(itemName);
-             });
-            tableBody.appendChild(itemRow);
+                document.querySelectorAll('#items-table tbody tr.selected-row').forEach(r => r.classList.remove('selected-row'));
+                e.currentTarget.classList.add('selected-row');
+                showChart(itemName);
+            });
 
-            // Draw sparkline *after* appending row
+            tableBody.appendChild(itemRow); // Add row to the DOM
+
+            // --- Draw Sparkline (after row is added) ---
             const sparkCanvas = document.getElementById(sparklineCanvasId);
             if (sparkCanvas) {
-                 const history = itemHistory[itemName] || [];
-                 const now = Date.now();
-                 const cutoffTime = now - HISTORY_DURATION_MS;
-                 const sparkHistoryData = history.filter(point => point.ts >= cutoffTime);
-                 drawSparkline(sparkCanvas, sparkHistoryData);
+                const history = itemHistory[itemName] || [];
+                const now = Date.now();
+                const cutoffTime = now - HISTORY_DURATION_MS;
+                const sparkHistoryData = history.filter(point => point.ts >= cutoffTime);
+                drawSparkline(sparkCanvas, sparkHistoryData);
             }
+
+            // --- Apply Highlight Animation (if price changed) ---
+            // Check !isInitialLoad, actual price change, and that price is a number
+            if (!isInitialLoad && priceChanged && typeof stateToRender.price === 'number' && previousState && typeof previousState.price === 'number' && previousState.price !== currentPrice ) {
+                const highlightClass = priceIncreased ? 'highlight-positive' : 'highlight-negative';
+                const cellsToHighlight = [tdPrice, tdChange, tdChangePercent]; // Target cells
+
+                cellsToHighlight.forEach(cell => { cell.classList.add(highlightClass); });
+
+                // Remove highlight after 1.5 seconds
+                setTimeout(() => {
+                    cellsToHighlight.forEach(cell => { cell.classList.remove(highlightClass); });
+                }, 1500); // 1500 milliseconds = 1.5 seconds
+            }
+            // --- End Highlight Animation ---
+
 
             // Add to state for saving
             newItemStates[itemName] = stateToRender;
@@ -385,37 +306,29 @@ function displayItems(currentFirebaseData) {
     return newItemStates; // Return the states that were actually rendered/calculated
 }
 
+
 // --- Event Listeners ---
-closeChartBtn.addEventListener('click', hideChart);
-chartPopup.addEventListener('click', (e) => { if (e.target === chartPopup) hideChart(); });
+if (closeChartBtn) closeChartBtn.addEventListener('click', hideChart);
+if (chartPopup) chartPopup.addEventListener('click', (e) => { if (e.target === chartPopup) hideChart(); });
 
 // --- Initial Load & Firebase Listener ---
 loadInitialData(); // Load state & history from localStorage
 
 console.log("Performing initial display from loaded data");
-// Initial render uses loaded state, returns the state map used for this render
-itemStates = displayItems(null);
+itemStates = displayItems(null); // Initial render uses loaded state
 console.log("Initial itemStates used for render:", Object.keys(itemStates).length, "items");
-// No need to save state here, it was just loaded
 
 // Attach Firebase listener *after* initial render
 itemsRef.on('value', (snapshot) => {
     const currentFirebaseData = snapshot.val();
-    // console.log("Firebase data received:", currentFirebaseData); // Reduce console noise
-
     // Calculate latest state based on FB data + previous state, render, update history
     const latestStates = displayItems(currentFirebaseData);
-
     // Update in-memory state and save it for next load
     itemStates = latestStates;
-    saveStates();
-
-    // console.log("In-memory states updated/saved:", Object.keys(itemStates).length, "items"); // Reduce noise
+    saveStates(); // Save latest state derived from Firebase data
 }, (error) => {
-    // Optional: Add error handling for Firebase connection
     console.error("Firebase Realtime Database read failed:", error);
-    // You could display an error message on the page here
-    tableBody.innerHTML = '<tr><td colspan="5" style="color: red; text-align: center;">Error connecting to database. Please check console.</td></tr>';
+    if(tableBody) tableBody.innerHTML = '<tr><td colspan="5" style="color: red; text-align: center;">Error connecting to database. Please check console.</td></tr>';
 });
 
 console.log("Script loaded. Firebase listener attached.");
