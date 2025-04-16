@@ -1,41 +1,172 @@
-/* Chart Popup Styles */
+/* --- Global Styles & Font --- */
+* {
+    box-sizing: border-box; /* Better layout control */
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    font-family: 'Roboto', sans-serif; /* Use Google Font */
+    background-color: #1a1a1d; /* Slightly different dark background */
+    color: #e0e0e0; /* Lighter grey text for better contrast */
+    padding: 20px;
+    line-height: 1.6;
+}
+
+.container { /* Optional: Add a container div in index.html around h1 and table if needed */
+    max-width: 900px; /* Limit content width */
+    margin: 20px auto; /* Center content */
+    padding: 0 15px;
+}
+
+h1 {
+    color: #f5f5f5; /* Brighter white for title */
+    text-align: center;
+    margin-bottom: 40px; /* More space below title */
+    font-weight: 700; /* Bolder title */
+    font-size: 2.5em; /* Larger title */
+}
+
+/* --- Table Styling --- */
+#items-table {
+    width: 100%;
+    border-collapse: collapse;
+    background-color: #2c2c31; /* Darker table background */
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4); /* Enhanced shadow */
+    border-radius: 8px; /* Rounded corners for the table */
+    overflow: hidden; /* Ensures border-radius clips content */
+    margin: 0 auto; /* Center table if not using .container */
+}
+
+/* Table Header */
+#items-table th {
+    background-color: #404045; /* Distinct header background */
+    color: #ffffff;
+    font-weight: 500; /* Medium weight for headers */
+    padding: 15px 20px; /* More padding */
+    text-align: left; /* Align headers left by default */
+    text-transform: uppercase; /* Uppercase headers */
+    font-size: 0.85em; /* Slightly smaller header text */
+    letter-spacing: 0.5px;
+    border-bottom: 2px solid #55555a; /* Stronger border below header */
+}
+
+/* Table Body Cells */
+#items-table td {
+    padding: 12px 20px; /* Consistent padding */
+    border-bottom: 1px solid #3a3a40; /* Subtle border between rows */
+    vertical-align: middle; /* Align text vertically in cells */
+}
+
+/* Zebra Striping for Rows */
+#items-table tbody tr:nth-child(even) {
+    background-color: #313136; /* Slightly lighter for even rows */
+}
+
+/* Remove border from last row */
+#items-table tbody tr:last-child td {
+    border-bottom: none;
+}
+
+/* Hover Effect */
+#items-table tbody tr:hover {
+    background-color: #4a4a50; /* Highlight row on hover */
+}
+
+/* Clickable Rows Indication */
+#items-table tbody tr {
+    cursor: pointer;
+    transition: background-color 0.2s ease-in-out; /* Smooth hover transition */
+}
+
+/* Highlight selected row (when chart is open) */
+#items-table tbody tr.selected-row {
+    background-color: #5f5f66; /* Darker highlight for selection */
+    font-weight: 500;
+}
+
+
+/* --- Column Specific Alignment --- */
+#items-table th:nth-child(1), /* Item Name Header */
+#items-table td:nth-child(1) { /* Item Name Cell */
+    text-align: left;
+    width: 40%; /* Give item name more space */
+    font-weight: 500; /* Slightly bolder item names */
+    color: #f0f0f0;
+}
+
+#items-table th:nth-child(2), /* Price Header */
+#items-table td:nth-child(2) { /* Price Cell */
+    text-align: right;
+}
+
+#items-table th:nth-child(3), /* Change Header */
+#items-table td:nth-child(3) { /* Change Cell */
+    text-align: right;
+}
+
+#items-table th:nth-child(4), /* Change % Header */
+#items-table td:nth-child(4) { /* Change % Cell */
+    text-align: right;
+}
+
+/* --- Price Change Styling --- */
+.positive-change {
+    color: #50c878; /* A slightly softer green */
+    font-weight: 500;
+}
+
+.negative-change {
+    color: #f08080; /* A slightly softer red */
+    font-weight: 500;
+}
+
+.no-change {
+    color: #888888;
+}
+
+
+/* --- Chart Popup Styling (Review/Refine) --- */
 .chart-popup {
-    position: fixed; /* Stay in place */
+    position: fixed;
     left: 0;
     top: 0;
     width: 100%;
     height: 100%;
-    background-color: rgba(0, 0, 0, 0.7); /* Semi-transparent background */
-    z-index: 1000; /* Appear on top */
-    display: flex; /* Use flexbox for centering */
+    background-color: rgba(10, 10, 10, 0.85); /* Darker, less transparent overlay */
+    z-index: 1000;
+    display: flex;
     justify-content: center;
     align-items: center;
     padding: 20px;
-    box-sizing: border-box;
+    backdrop-filter: blur(3px); /* Optional: Blur background */
+    -webkit-backdrop-filter: blur(3px);
 }
 
 .chart-content {
-    background-color: #252526; /* Match table background */
-    padding: 25px;
-    border-radius: 8px;
-    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.5);
+    background-color: #2c2c31; /* Match table background */
+    padding: 30px; /* More padding */
+    border-radius: 10px;
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.6);
     position: relative;
-    width: 90%;
-    max-width: 700px; /* Limit max width */
-    max-height: 80vh; /* Limit max height */
-    overflow-y: auto; /* Add scroll if content overflows */
+    width: 95%; /* Use more width */
+    max-width: 800px; /* Increase max width */
+    max-height: 85vh;
+    overflow-y: auto;
+    border: 1px solid #404045; /* Subtle border */
 }
 
 .close-chart-btn {
     position: absolute;
-    top: 10px;
-    right: 15px;
+    top: 15px;
+    right: 20px;
     background: none;
     border: none;
-    font-size: 2rem;
+    font-size: 2.2rem;
     color: #aaaaaa;
     cursor: pointer;
     line-height: 1;
+    transition: color 0.2s ease;
 }
 .close-chart-btn:hover {
     color: #ffffff;
@@ -43,26 +174,37 @@
 
 #chart-title {
     margin-top: 0;
-    margin-bottom: 20px;
-    color: #cccccc;
+    margin-bottom: 25px;
+    color: #f5f5f5;
     text-align: center;
-    font-size: 1.4em;
+    font-size: 1.6em;
+    font-weight: 500;
 }
 
 .chart-wrapper {
     position: relative;
-     /* Adjust height as needed, make sure it's responsive */
-     height: 40vh;
-     min-height: 250px;
+    height: 50vh; /* More height for chart */
+    min-height: 300px;
+    background-color: rgba(0,0,0,0.1); /* Faint background inside wrapper */
+    border-radius: 4px;
+    padding: 10px;
 }
 
-
-/* Style table rows to indicate they are clickable */
-#items-table tbody tr {
-    cursor: pointer;
+#chart-no-data {
+    color: #a0a0a0;
+    font-style: italic;
 }
 
-/* Optional: Highlight row being viewed */
-#items-table tbody tr.selected-row {
-    background-color: #4a4a4a; /* Darker highlight */
+/* Optional: Improve scrollbar appearance in chart popup for webkit browsers */
+.chart-content::-webkit-scrollbar {
+    width: 8px;
+}
+.chart-content::-webkit-scrollbar-track {
+    background: #313136;
+    border-radius: 4px;
+}
+.chart-content::-webkit-scrollbar-thumb {
+    background-color: #55555a;
+    border-radius: 4px;
+    border: 2px solid #313136;
 }
