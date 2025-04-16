@@ -11,7 +11,12 @@ const firebaseConfig = {
 };
 
 // --- Initialize Firebase ---
-firebase.initializeApp(firebaseConfig);
+if (firebaseConfig.apiKey.startsWith("AIza") && firebaseConfig.apiKey.includes("replace")) {
+    alert("Please replace the placeholder Firebase configuration in script.js with your actual project config!");
+    console.error("Firebase config not set in script.js");
+} else {
+    firebase.initializeApp(firebaseConfig);
+}
 const database = firebase.database();
 const itemsRef = database.ref('items');
 
@@ -20,15 +25,22 @@ const tableBody = document.getElementById('items-table-body');
 const chartPopup = document.getElementById('chart-popup');
 const chartTitle = document.getElementById('chart-title');
 const closeChartBtn = document.getElementById('close-chart-btn');
-const chartCanvas = document.getElementById('item-price-chart').getContext('2d');
+const chartCanvasElement = document.getElementById('item-price-chart');
 const chartNoDataMsg = document.getElementById('chart-no-data');
+let chartCtx = null; // Initialize context later
+if (chartCanvasElement) {
+    chartCtx = chartCanvasElement.getContext('2d');
+} else {
+    console.error("Chart canvas element not found!");
+}
+
 
 // --- State Management ---
-const stateStorageKey = 'gameItemPriceStates';
-const historyStorageKey = 'gameItemPriceHistory_v2';
+const stateStorageKey = 'gameItemPriceStates_v1'; // Renamed to avoid conflicts if structure changed
+const historyStorageKey = 'gameItemPriceHistory_v3'; // Renamed for potential structure changes
 let itemStates = {}; // Holds { price, change, changePercent, changeClass, changePrefix }
 let itemHistory = {}; // Holds { itemName: [{ts: timestamp, price: number}] }
-let itemChart = null;
+let itemChartInstance = null; // Holds the Chart.js instance
 
 // --- Load Initial State & History ---
 function loadInitialData() {
@@ -36,7 +48,7 @@ function loadInitialData() {
     if (storedStatesString) {
         try {
             itemStates = JSON.parse(storedStatesString);
-            console.log("Loaded states:", itemStates);
+            console.log("Loaded states:", Object.keys(itemStates).length, "items");
         } catch (e) { console.error("Error parsing stored states:", e); localStorage.removeItem(stateStorageKey); itemStates = {}; }
     }
 
@@ -44,14 +56,15 @@ function loadInitialData() {
     if (storedHistoryString) {
         try {
             itemHistory = JSON.parse(storedHistoryString);
-            console.log("Loaded history");
+            console.log("Loaded history for", Object.keys(itemHistory).length, "items");
+            // Optional: Prune history on load to clean up very old data
+            pruneAllHistory();
         } catch (e) { console.error("Error parsing stored history:", e); localStorage.removeItem(historyStorageKey); itemHistory = {};}
     }
 }
-loadInitialData();
 
 // --- History Management ---
-const HISTORY_DURATION_MS = 24 * 60 * 60 * 1000;
+const HISTORY_DURATION_MS = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
 
 function addHistoryPoint(itemName, price) {
     if (typeof price !== 'number') return;
@@ -59,25 +72,57 @@ function addHistoryPoint(itemName, price) {
     if (!itemHistory[itemName]) {
         itemHistory[itemName] = [];
     }
+    // Avoid adding duplicate points with the exact same timestamp (can happen with rapid updates)
+    const lastPoint = itemHistory[itemName][itemHistory[itemName].length - 1];
+    if (lastPoint && lastPoint.ts === now && lastPoint.price === price) {
+        return; // Skip duplicate
+    }
+
     itemHistory[itemName].push({ ts: now, price: price });
+    // Pruning happens here too
     const cutoffTime = now - HISTORY_DURATION_MS;
     itemHistory[itemName] = itemHistory[itemName].filter(point => point.ts >= cutoffTime);
 }
 
+function pruneAllHistory() {
+    const now = Date.now();
+    const cutoffTime = now - HISTORY_DURATION_MS;
+    let changed = false;
+    for (const itemName in itemHistory) {
+        const originalLength = itemHistory[itemName].length;
+        itemHistory[itemName] = itemHistory[itemName].filter(point => point.ts >= cutoffTime);
+        if (itemHistory[itemName].length !== originalLength) {
+            changed = true;
+        }
+        // Remove item from history if it has no points left
+        if (itemHistory[itemName].length === 0) {
+            delete itemHistory[itemName];
+            changed = true;
+        }
+    }
+    if (changed) {
+        console.log("Pruned old history entries.");
+        saveHistory(); // Save if pruning occurred
+    }
+}
+
 function saveHistory() {
     try {
-        localStorage.setItem(historyStorageKey, JSON.stringify(itemHistory));
+        if (Object.keys(itemHistory).length > 0) {
+            localStorage.setItem(historyStorageKey, JSON.stringify(itemHistory));
+        } else {
+            localStorage.removeItem(historyStorageKey); // Clean up if empty
+        }
     } catch (e) { console.error("Error saving history:", e); }
 }
 
 function saveStates() {
      try {
-        // Ensure we don't save if itemStates is empty after initial load failure or data removal
         if (Object.keys(itemStates).length > 0) {
              localStorage.setItem(stateStorageKey, JSON.stringify(itemStates));
-             console.log("Saved latest item states to localStorage");
+             // console.log("Saved latest item states"); // Reduce console noise
         } else {
-             localStorage.removeItem(stateStorageKey); // Clear storage if state is empty
+             localStorage.removeItem(stateStorageKey);
              console.log("Item states empty, removed from localStorage.");
         }
      } catch (e) { console.error("Error saving states:", e); }
@@ -89,8 +134,60 @@ function formatNumber(num) {
     return num.toLocaleString();
 }
 
+// --- Sparkline Drawing Function ---
+function drawSparkline(canvas, historyData) {
+    if (!canvas || !historyData || historyData.length < 2) {
+        if(canvas) {
+            const ctx = canvas.getContext('2d');
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+        }
+        return;
+    }
+
+    const ctx = canvas.getContext('2d');
+    const width = canvas.width;
+    const height = canvas.height;
+    ctx.clearRect(0, 0, width, height);
+
+    let minPrice = historyData[0].price, maxPrice = historyData[0].price;
+    let minTs = historyData[0].ts, maxTs = historyData[0].ts;
+
+    for (let i = 1; i < historyData.length; i++) {
+        const point = historyData[i];
+        if (point.price < minPrice) minPrice = point.price;
+        if (point.price > maxPrice) maxPrice = point.price;
+        if (point.ts < minTs) minTs = point.ts; // Should be sorted but check
+        if (point.ts > maxTs) maxTs = point.ts;
+    }
+
+    const priceRange = maxPrice - minPrice;
+    const timeRange = maxTs - minTs;
+
+    const startPrice = historyData[0].price;
+    const endPrice = historyData[historyData.length - 1].price;
+    ctx.strokeStyle = (endPrice > startPrice) ? '#50c878' : '#f08080';
+    ctx.lineWidth = 1.5;
+
+    ctx.beginPath();
+    const paddingX = 1, paddingY = 1;
+
+    for (let i = 0; i < historyData.length; i++) {
+        const point = historyData[i];
+        let x = paddingX;
+        if (timeRange > 0) x = paddingX + ((point.ts - minTs) / timeRange) * (width - 2 * paddingX);
+        else x = width / 2;
+
+        let y = height / 2;
+        if (priceRange > 0) y = (height - paddingY) - ((point.price - minPrice) / priceRange) * (height - 2 * paddingY);
+
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+}
+
+
 // --- Charting ---
-// (showChart and hideChart functions remain the same as the previous version)
 function showChart(itemName) {
     console.log(`Showing chart for: ${itemName}`);
     const history = itemHistory[itemName] || [];
@@ -98,57 +195,76 @@ function showChart(itemName) {
     const cutoffTime = now - HISTORY_DURATION_MS;
     const chartData = history.filter(point => point.ts >= cutoffTime);
 
-    if (itemChart) itemChart.destroy();
-    chartNoDataMsg.style.display = 'none'; // Assume data exists initially
+    if (itemChartInstance) itemChartInstance.destroy(); // Destroy previous chart
+    chartNoDataMsg.style.display = 'none'; // Hide message by default
 
+    // Prepare chart data points
+    let chartPoints = [];
     if (chartData.length === 0) {
-         console.log("No history points found for the last 24h.");
-         chartNoDataMsg.style.display = 'block';
-         // Still show popup to display the message
+        console.log("No history points found for the last 24h.");
+        chartNoDataMsg.style.display = 'block'; // Show message
     } else if (chartData.length === 1) {
-        // Duplicate the single point slightly earlier for line drawing
-        chartData.unshift({ ts: chartData[0].ts - 1000, price: chartData[0].price });
+        // Duplicate point slightly earlier for Chart.js to draw *something*
+        chartPoints = [
+            { x: chartData[0].ts - 1000, y: chartData[0].price },
+            { x: chartData[0].ts, y: chartData[0].price }
+        ];
+    } else {
+        chartPoints = chartData.map(point => ({ x: point.ts, y: point.price }));
     }
 
     chartTitle.textContent = `${itemName} History (Last 24h)`;
 
-    if (chartData.length > 0) { // Only create chart if there's data to plot
-        itemChart = new Chart(chartCanvas, {
+    if (chartPoints.length > 0 && chartCtx) { // Only create chart if there's data AND context exists
+        itemChartInstance = new Chart(chartCtx, {
             type: 'line',
             data: {
                 datasets: [{
                     label: 'Price',
-                    data: chartData.map(point => ({ x: point.ts, y: point.price })),
+                    data: chartPoints,
                     borderColor: 'rgb(75, 192, 192)', tension: 0.1,
                     pointBackgroundColor: 'rgb(75, 192, 192)', pointRadius: 3,
+                    pointHoverRadius: 5 // Make points bigger on hover
                 }]
             },
-            options: { /* ... chart options remain the same ... */
+            options: {
                 responsive: true, maintainAspectRatio: false,
                 scales: {
                     x: {
                         type: 'time', time: { unit: 'hour', tooltipFormat: 'PPpp', displayFormats: { hour: 'HH:mm' } },
-                        title: { display: true, text: 'Time' }, grid: { color: 'rgba(255, 255, 255, 0.1)' }
+                        title: { display: true, text: 'Time', color: '#ccc' }, grid: { color: 'rgba(255, 255, 255, 0.1)' },
+                        ticks: { color: '#ccc'} // X-axis labels color
                     },
                     y: {
-                        beginAtZero: false, title: { display: true, text: 'Price' },
-                        ticks: { callback: (v) => formatNumber(v) }, grid: { color: 'rgba(255, 255, 255, 0.1)' }
+                        beginAtZero: false, title: { display: true, text: 'Price', color: '#ccc'},
+                        ticks: { callback: (v) => formatNumber(v), color: '#ccc' }, // Y-axis labels color
+                        grid: { color: 'rgba(255, 255, 255, 0.1)' }
                     }
                 },
-                plugins: { tooltip: { callbacks: { label: (c) => `${c.dataset.label || ''}: ${formatNumber(c.parsed.y)}` } } }
+                plugins: {
+                    legend: { labels: { color: '#ccc' } }, // Legend text color
+                    tooltip: {
+                        callbacks: { label: (c) => `${c.dataset.label || ''}: ${formatNumber(c.parsed.y)}` },
+                         bodyFont: { size: 14 }, // Tooltip font size
+                         titleFont: { size: 16 }
+                    }
+                },
+                 interaction: { // Improve hover interaction
+                    mode: 'index',
+                    intersect: false,
+                 },
             }
         });
-    } else {
-         // Clear canvas if no data and chart existed before (destroy might not be enough)
-         chartCanvas.clearRect(0, 0, chartCanvas.canvas.width, chartCanvas.canvas.height);
+    } else if (chartCtx) {
+         // Clear canvas if no data but context exists
+         chartCtx.clearRect(0, 0, chartCtx.canvas.width, chartCtx.canvas.height);
     }
 
-
-    chartPopup.style.display = 'flex';
+    chartPopup.style.display = 'flex'; // Show the popup
 }
 
 function hideChart() {
-    if (itemChart) { itemChart.destroy(); itemChart = null; }
+    if (itemChartInstance) { itemChartInstance.destroy(); itemChartInstance = null; }
     chartPopup.style.display = 'none';
     document.querySelectorAll('#items-table tbody tr.selected-row').forEach(r => r.classList.remove('selected-row'));
 }
@@ -156,162 +272,150 @@ function hideChart() {
 
 // --- Display Logic ---
 function displayItems(currentFirebaseData) {
-    const isInitialLoad = currentFirebaseData === null; // Flag for initial display from storage
+    const isInitialLoad = currentFirebaseData === null;
     tableBody.innerHTML = '';
-    const dataToShow = isInitialLoad ? {} : (currentFirebaseData || {}); // Use empty object if FB data is null/undefined
+    const dataToShow = isInitialLoad ? {} : (currentFirebaseData || {});
 
     let newItemStates = {};
-    const previousItemKeys = Object.keys(itemStates); // Keys from loaded state
-    const currentItemKeys = Object.keys(dataToShow); // Keys from Firebase
+    const previousItemKeys = Object.keys(itemStates);
+    const currentItemKeys = Object.keys(dataToShow);
     const allItemKeys = new Set([...previousItemKeys, ...currentItemKeys]);
     const sortedKeys = Array.from(allItemKeys).sort();
 
     if (sortedKeys.length === 0) {
-        tableBody.innerHTML = '<tr><td colspan="4">Loading or no items found...</td></tr>';
-        return {};
+        tableBody.innerHTML = '<tr><td colspan="5">Loading or no items found...</td></tr>';
+        return {}; // Return empty state
     }
 
     let historyNeedsUpdate = false;
 
     sortedKeys.forEach(itemName => {
-        const currentPrice = dataToShow[itemName]; // Price from Firebase (or undefined if initial load/deleted)
-        const previousState = itemStates[itemName]; // State loaded from localStorage or previous cycle
-
-        // Determine the definitive state for this item for *this* rendering cycle
+        const currentPrice = dataToShow[itemName];
+        const previousState = itemStates[itemName];
         let stateToRender = {};
         let priceChanged = false;
 
         if (isInitialLoad) {
-            // On initial load, simply use the loaded state if it exists
+            // Use stored state for initial display
             stateToRender = previousState || { price: 'N/A', change: 'N/A', changePercent: 'N/A', changeClass: 'no-change', changePrefix: '' };
-            // We don't calculate changes on initial load, just display stored ones
         } else {
-            // This is a Firebase update
-            let calculatedState = { // Start calculating the new state
-                price: 'N/A', change: 'N/A', changePercent: 'N/A',
-                changeClass: 'no-change', changePrefix: ''
-            };
+            // Calculate new state based on Firebase update
+            let calculatedState = { price: 'N/A', change: 'N/A', changePercent: 'N/A', changeClass: 'no-change', changePrefix: '' };
 
-            if (currentPrice !== undefined) { // Item exists in Firebase data
+            if (currentPrice !== undefined) {
                 calculatedState.price = currentPrice;
-
-                 // Check if price changed compared to last known state
-                 if (previousState && typeof previousState.price === 'number' && typeof currentPrice === 'number' && previousState.price !== currentPrice) {
-                     priceChanged = true;
-                 } else if (!previousState && typeof currentPrice === 'number') {
-                     priceChanged = true; // New item added
-                 }
-
-                // Calculate change based on previous *price* if available
                 if (previousState && typeof previousState.price === 'number' && typeof currentPrice === 'number') {
-                    const priceDiff = currentPrice - previousState.price;
-                    calculatedState.change = priceDiff;
-                    if (previousState.price !== 0) calculatedState.changePercent = (priceDiff / previousState.price) * 100;
-                    else if (currentPrice > 0) calculatedState.changePercent = Infinity;
-                    else calculatedState.changePercent = 0;
+                     if (previousState.price !== currentPrice) priceChanged = true; // Price definitely changed
+                     const priceDiff = currentPrice - previousState.price;
+                     calculatedState.change = priceDiff;
+                     if (previousState.price !== 0) calculatedState.changePercent = (priceDiff / previousState.price) * 100;
+                     else if (currentPrice > 0) calculatedState.changePercent = Infinity;
+                     else calculatedState.changePercent = 0;
 
-                    if (priceDiff > 0) { calculatedState.changeClass = 'positive-change'; calculatedState.changePrefix = '+'; }
-                    else if (priceDiff < 0) { calculatedState.changeClass = 'negative-change'; }
-                    else { calculatedState.change = 0; calculatedState.changePercent = 0; } // Ensure zero
-
+                     if (priceDiff > 0) { calculatedState.changeClass = 'positive-change'; calculatedState.changePrefix = '+'; }
+                     else if (priceDiff < 0) { calculatedState.changeClass = 'negative-change'; }
+                     else { calculatedState.change = 0; calculatedState.changePercent = 0; } // Explicitly zero
                 } else if (typeof currentPrice === 'number') {
-                    // New item or previous price wasn't number, can't calculate change yet
-                    calculatedState.change = 'N/A'; calculatedState.changePercent = 'N/A';
+                     priceChanged = true; // New item added counts as change for history
+                     calculatedState.change = 'N/A'; calculatedState.changePercent = 'N/A';
                 }
 
-                 // Add history point if the price changed
-                 if (priceChanged) {
-                     addHistoryPoint(itemName, currentPrice);
-                     historyNeedsUpdate = true;
-                 }
-                stateToRender = calculatedState; // Use the newly calculated state for rendering
-
+                if (priceChanged) {
+                    addHistoryPoint(itemName, currentPrice);
+                    historyNeedsUpdate = true;
+                }
+                stateToRender = calculatedState;
             } else if (previousState) {
-                // Item existed before but not in Firebase now (deleted)
-                return; // Don't render a row, don't include in newItemStates
+                // Item was deleted
+                return; // Don't render row, exclude from newItemStates
             } else {
-                // Item doesn't exist now or before
-                return; // Skip
+                return; // Skip if doesn't exist now or before
             }
-        } // End of Firebase update logic
+        }
 
-
-        // --- Prepare display values FROM stateToRender ---
+        // --- Prepare display values ---
         const displayPrice = typeof stateToRender.price === 'number' ? formatNumber(stateToRender.price) : 'N/A';
-        let displayChange = 'N/A';
-        let displayChangePercent = 'N/A'; // Default to N/A
+        let displayChange = 'N/A', displayChangePercent = 'N/A';
         const displayChangeClass = stateToRender.changeClass || 'no-change';
         const displayChangePrefix = stateToRender.changePrefix || '';
 
-        // Use the stored/calculated change values directly
-        if (typeof stateToRender.change === 'number') {
-            displayChange = formatNumber(stateToRender.change.toFixed(0));
-        }
+        if (typeof stateToRender.change === 'number') displayChange = formatNumber(stateToRender.change.toFixed(0));
         if (typeof stateToRender.changePercent === 'number') {
-            if (stateToRender.changePercent === Infinity) displayChangePercent = "∞%";
-            else displayChangePercent = `${stateToRender.changePercent.toFixed(2)}%`;
+            displayChangePercent = (stateToRender.changePercent === Infinity) ? "∞%" : `${stateToRender.changePercent.toFixed(2)}%`;
         }
 
+        // --- Create Row & Sparkline ---
+        if (stateToRender.price !== undefined) {
+            const itemRow = document.createElement('tr');
+            itemRow.setAttribute('data-item-name', itemName);
+            const sparklineCanvasId = `spark-${itemName.replace(/[^a-zA-Z0-9_\-]/g, '')}`; // Even safer ID
 
-        // --- Create and append table row ---
-        if (stateToRender.price !== undefined) { // Only add row if item wasn't deleted
-             const itemRow = document.createElement('tr');
-             itemRow.setAttribute('data-item-name', itemName);
-             itemRow.innerHTML = `
-                 <td>${itemName}</td>
-                 <td>${displayPrice}</td>
-                 <td class="${displayChangeClass}">${displayChangePrefix}${displayChange}</td>
-                 <td class="${displayChangeClass}">${displayChangePrefix}${displayChangePercent}</td>
-             `;
-             itemRow.addEventListener('click', (e) => {
+            itemRow.innerHTML = `
+                <td>${itemName}</td>
+                <td><canvas id="${sparklineCanvasId}" class="sparkline-canvas" width="100" height="30"></canvas></td>
+                <td>${displayPrice}</td>
+                <td class="${displayChangeClass}">${displayChangePrefix}${displayChange}</td>
+                <td class="${displayChangeClass}">${displayChangePrefix}${displayChangePercent}</td>
+            `;
+            itemRow.addEventListener('click', (e) => {
                  document.querySelectorAll('#items-table tbody tr.selected-row').forEach(r => r.classList.remove('selected-row'));
                  e.currentTarget.classList.add('selected-row');
                  showChart(itemName);
              });
-             tableBody.appendChild(itemRow);
+            tableBody.appendChild(itemRow);
 
-             // Add to the state object that will be saved (important!)
-             newItemStates[itemName] = stateToRender;
+            // Draw sparkline *after* appending row
+            const sparkCanvas = document.getElementById(sparklineCanvasId);
+            if (sparkCanvas) {
+                 const history = itemHistory[itemName] || [];
+                 const now = Date.now();
+                 const cutoffTime = now - HISTORY_DURATION_MS;
+                 const sparkHistoryData = history.filter(point => point.ts >= cutoffTime);
+                 drawSparkline(sparkCanvas, sparkHistoryData);
+            }
+
+            // Add to state for saving
+            newItemStates[itemName] = stateToRender;
         }
+    }); // End forEach
 
-    }); // End sortedKeys.forEach
-
-    if (historyNeedsUpdate && !isInitialLoad) { // Only save history if updated AND not initial load
-         saveHistory();
+    if (historyNeedsUpdate && !isInitialLoad) {
+        saveHistory();
     }
-
-    // Return the states derived from this cycle (either loaded or calculated)
-    // This will become the `itemStates` for the *next* calculation/save
-    return newItemStates;
+    return newItemStates; // Return the states that were actually rendered/calculated
 }
-
 
 // --- Event Listeners ---
 closeChartBtn.addEventListener('click', hideChart);
 chartPopup.addEventListener('click', (e) => { if (e.target === chartPopup) hideChart(); });
 
-// --- Initial Display & Firebase Listener ---
-console.log("Performing initial display from loaded itemStates");
-// Call displayItems with null to use localStorage data for the first render
-itemStates = displayItems(null); // Update itemStates with what was actually rendered initially
-console.log("Initial itemStates used for render:", itemStates);
-// No need to save here, we just loaded or started fresh
+// --- Initial Load & Firebase Listener ---
+loadInitialData(); // Load state & history from localStorage
 
+console.log("Performing initial display from loaded data");
+// Initial render uses loaded state, returns the state map used for this render
+itemStates = displayItems(null);
+console.log("Initial itemStates used for render:", Object.keys(itemStates).length, "items");
+// No need to save state here, it was just loaded
 
-// Listen for Firebase changes
+// Attach Firebase listener *after* initial render
 itemsRef.on('value', (snapshot) => {
     const currentFirebaseData = snapshot.val();
-    console.log("Firebase data received:", currentFirebaseData);
-    console.log("Calculating changes based on current itemStates:", itemStates); // Log state *before* update
+    // console.log("Firebase data received:", currentFirebaseData); // Reduce console noise
 
-    // Update display, calculate next states, and update history
+    // Calculate latest state based on FB data + previous state, render, update history
     const latestStates = displayItems(currentFirebaseData);
 
-    // Update the in-memory state *and* save it for the next refresh/load
-    itemStates = latestStates; // Update global state
-    saveStates(); // Save the states derived from the *latest* Firebase data
+    // Update in-memory state and save it for next load
+    itemStates = latestStates;
+    saveStates();
 
-    console.log("In-memory itemStates updated and saved:", itemStates);
+    // console.log("In-memory states updated/saved:", Object.keys(itemStates).length, "items"); // Reduce noise
+}, (error) => {
+    // Optional: Add error handling for Firebase connection
+    console.error("Firebase Realtime Database read failed:", error);
+    // You could display an error message on the page here
+    tableBody.innerHTML = '<tr><td colspan="5" style="color: red; text-align: center;">Error connecting to database. Please check console.</td></tr>';
 });
 
-console.log("Script loaded.");
+console.log("Script loaded. Firebase listener attached.");
